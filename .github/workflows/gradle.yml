@@ -6,7 +6,7 @@
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
 
 # Repo Action 페이지에 나타날 이름 
-name: Spring Boot & Gradle CI/CD 
+name: Spring Boot KUIT-2 CI/CD
 
 # Event Trigger
 # master branch에 push 또는 pull request가 발생할 경우 동작
@@ -16,24 +16,29 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-
+    
+# 코드의 내용을 이 파일을 실행하여 action을 수행하는 주체(Github Actions에서 사용하는 VM)가 읽을 수 있도록 허용합니다.
 permissions:
   contents: read
-
+  
+# 실제 실행될 내용들을 정의합니다.
 jobs:
   build:
     # 실행 환경 지정
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # ubuntu 최신 버전에서 script를 실행
     
     # Task의 sequence를 명시한다.
     steps:
+    # 지정한 저장소(현재 REPO)에서 코드를 워크플로우 환경으로 가져오도록 하는 github action
     - uses: actions/checkout@v3
+    
+    # open jdk 17 버전 환경을 세팅
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
         java-version: '17'
         distribution: 'adopt'
-
+        
     - name : (Release) Get current date
       id: date
       run: echo "::set-output name=date::$date+'%Y/%m/%d')"
@@ -45,27 +50,54 @@ jobs:
     - name: Build with Gradle
       run: |
         ./gradlew -version
-        ./gradlew build --no-daemon
-
-    # 전송할 파일을 담을 디렉토리 생성
-    - name: Make Directory for deliver
-      run: mkdir deploy
-
-      # Jar 파일 Copy
-    - name: Copy Jar
-      run: cp ./build/libs/*.jar ./deploy/
-
-      # 압축파일 형태로 전달
-    - name: Make zip file
-      run: zip -r -qq -j ./springboot-intro-build.zip ./deploy
-
-      # S3 Bucket으로 copy
-    - name: Deliver to AWS S3
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        ./gradlew clean build -x test
+   
+   # dockerfile을 통해 이미지를 빌드하고, 이를 docker repo로 push 합니다.
+   # 이 때 사용되는 ${{ secrets.DOCKER_REPO }}/directors-dev 가 위에서 만든 도커 repository 입니다.
+    - name: Docker build & push to docker repo
       run: |
-        aws s3 cp \
-        --region ap-northeast-2 \
-        --acl private \ 
-        ./springboot-intro-build.zip s3://springboot-intro-build/
+           docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+           docker build -f Dockerfile -t ${{ secrets.DOCKER_REPO }}/directors-dev .
+           docker push ${{ secrets.DOCKER_REPO }}/directors-dev
+
+
+   # appleboy/ssh-action@master 액션을 사용하여 지정한 서버에 ssh로 접속하고, script를 실행합니다.
+   # script의 내용은 도커의 기존 프로세스들을 제거하고, docker repo로부터 방금 위에서 push한 내용을 pull 받아 실행하는 것입니다. 
+   # 실행 시, docker-compose를 사용합니다.
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
+      id: deploy
+      with:
+        host: ${{ secrets.HOST }}
+        username: ubuntu
+        key: ${{ secrets.KEY }}
+        envs: GITHUB_SHA
+        script: |
+          sudo docker rm -f $(docker ps -qa)
+          sudo docker pull ${{ secrets.DOCKER_REPO }}/directors-dev
+          docker-compose up -d
+          docker image prune -f
+
+    # S3 -> codeDeploy -> EC2 방식       
+    # # 전송할 파일을 담을 디렉토리 생성
+    # - name: Make Directory for deliver
+    #   run: mkdir deploy
+
+    #   # Jar 파일 Copy
+    # - name: Copy Jar
+    #   run: cp ./build/libs/*.jar ./deploy/
+
+    #   # 압축파일 형태로 전달
+    # - name: Make zip file
+    #   run: zip -r -qq -j ./springboot-intro-build.zip ./deploy
+
+    #   # S3 Bucket으로 copy
+    # - name: Deliver to AWS S3
+    #   env:
+    #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    #   run: |
+    #     aws s3 cp \
+    #     --region ap-northeast-2 \
+    #     --acl private \ 
+    #     ./springboot-intro-build.zip s3://springboot-intro-build/
