@@ -1,7 +1,6 @@
 package com.kuit.backenddaangnapi.user.dto;
 
-import com.kuit.backenddaangnapi.global.exception.custom.EmptySignupArgumentException;
-import lombok.AllArgsConstructor;
+import com.kuit.backenddaangnapi.global.exception.EmptyArgumentException;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,8 +20,8 @@ public class SignUpReq {
     }
 
     public void isValid(){
-        if (this.userId == null || this.password == null || this.nickname == null) {
-            throw new EmptySignupArgumentException(this);
+        if (this.userId.isEmpty()|| this.password.isEmpty() || this.nickname.isEmpty()) {
+            throw new EmptyArgumentException();
         }
 
     }
