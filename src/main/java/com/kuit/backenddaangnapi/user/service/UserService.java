@@ -63,7 +63,9 @@ public class UserService {
 
     public UserInfoRes getUser(Authentication authentication) {
         String id = getId(authentication);
-        User user = userRepository.findById(id).get();
+        User user = userRepository.findById(id).orElseThrow(
+
+        );
         return UserInfoRes.of(user);
     }
 

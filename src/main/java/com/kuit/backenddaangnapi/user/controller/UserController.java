@@ -28,32 +28,38 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping("/signup")
-    public BaseResponse<SignUpRes> singUp(@RequestBody SignUpReq signUpReq){
-        try{
+    public BaseResponse<SignUpRes> singUp(@RequestBody SignUpReq signUpReq) {
+        try {
             SignUpRes signUpRes = userService.signUp(signUpReq);
-            return new BaseResponse<>(signUpRes,BaseResponseStatus.CREATED);
-        }catch (DuplicateUserException e){
+            return new BaseResponse<>(signUpRes, BaseResponseStatus.CREATED);
+        } catch (DuplicateUserException e) {
             return new BaseResponse<>(BaseResponseStatus.CONFLICT);
-        }catch(EmptyArgumentException e){
+        } catch (EmptyArgumentException e) {
             return new BaseResponse<>(BaseResponseStatus.BAD_REQUEST);
         }
     }
 
     @PostMapping("/login")
-    public BaseResponse<LoginRes> login(@RequestBody LoginReq loginReq){
-        try{
+    public BaseResponse<LoginRes> login(@RequestBody LoginReq loginReq) {
+        try {
             LoginRes loginRes = userService.login(loginReq);
             return new BaseResponse<>(loginRes);
-        }catch (NotFoundUserException e){
+        } catch (NotFoundUserException e) {
             return new BaseResponse<>(BaseResponseStatus.NOT_FOUND);
-        }catch(EmptyArgumentException e){
+        } catch (EmptyArgumentException e) {
             return new BaseResponse<>(BaseResponseStatus.BAD_REQUEST);
         }
     }
 
     @GetMapping
-    public BaseResponse<UserInfoRes> getUser(Authentication authentication){
-        UserInfoRes userInfoRes = userService.getUser(authentication);
-        return new BaseResponse<>(userInfoRes);
+    public BaseResponse<UserInfoRes> getUser(Authentication authentication) {
+
+        try {
+            UserInfoRes userInfoRes = userService.getUser(authentication);
+            return new BaseResponse<>(userInfoRes);
+        } catch (Exception e) {
+            return new BaseResponse<>(BaseResponseStatus.BAD_REQUEST);
+        }
     }
+}
 }
