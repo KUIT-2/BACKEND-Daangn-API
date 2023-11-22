@@ -64,7 +64,7 @@ public class UserService {
     public UserInfoRes getUser(Authentication authentication) {
         String id = getId(authentication);
         User user = userRepository.findById(id).orElseThrow(
-
+                ()-> new NotFoundUserException()
         );
         return UserInfoRes.of(user);
     }
